@@ -1,0 +1,70 @@
+version: 0.2
+env:
+  shell: bash
+
+phases:
+
+  install:
+    runtime-versions:
+      python: 3.9
+      nodejs: 14
+    commands:
+      - echo "start of code build"
+      - echo "checking to see if application exists"
+      # - # check if production version exist
+      # - # if not exist then we need to build the application
+      # - echo "Installing Required Modules, for version $LAMBDA_VERSION_NUMBER"
+      - cd ${CODEBUILD_SRC_DIR}
+      - pip install --upgrade pip
+      - pip install pipenv
+      - pipenv install --dev
+      - cd ${CODEBUILD_SRC_DIR}/lambdas/createcustomer
+      # - cd ${CODEBUILD_SRC_DIR}/lambdas/getaccount
+      - yarn install 
+
+  pre_build:
+    commands:
+      - echo "start of pre build"
+      - echo "Pre build commands like testing, compliance validate etc"
+      # - |
+      #   if [ "$VERSION_EXIST" = false ] || [ "$DEV_APP_EXIST" = false ]; then
+      #     cd ${CODEBUILD_SRC_DIR}/${MODULE}/packages/${MICROSERVICE_NAME}
+      #     set -e
+      #     yarn test
+      #     yarn lint.ci
+      #     pipenv run samvalidate
+      #     pipenv run lint_cfn
+      #     set +e
+      #   fi
+
+  build:
+    commands:
+      - echo "These are build commands like sam build, sam package etc "
+        #   yarn build
+        #   echo "Remove dev dependencies"
+        #   rm -rf node_modules
+        #   rm -rf ../../../node_modules
+        #   yarn --production --frozen-lockfile
+        #   echo "Copy Node_Modules to lambda package"
+        #   cp -R ../../../node_modules dist/node_modules
+        #   rm -rf dist/node_modules/@cus-paycol-debt # removing cus-paycol-packages as they are not needed for the lambda
+        #   cp README.md dist/README.md
+        #   cp package.json dist/package.json
+        #   echo "packaging template.yaml file"
+      - cd ${CODEBUILD_SRC_DIR}
+      - aws s3 cp swagger.yaml s3://${RESOURCE_PREFIX}-pipeline-artifacts/
+      # - sam package --s3-bucket hari-mwdet-repo --template-file template.yaml --output-template-file packaged-template.yml --s3-prefix getaccount
+      - sam package --s3-bucket ${RESOURCE_PREFIX}-pipeline-artifacts --template-file template.yaml --output-template-file packaged-template.yml --s3-prefix createcustomer
+        # fi
+
+  post_build:
+    commands:
+      - echo "this is for post build. Here SAM will be depoyed"
+
+      #     echo "Deploying the SAM Template"
+      - sam deploy --template-file packaged-template.yml --stack-name ${RESOURCE_PREFIX}-createcustomer --capabilities CAPABILITY_IAM --no-fail-on-empty-changeset --parameter-overrides Environment=dev UniqueName=${RESOURCE_PREFIX}
+
+
+artifacts:
+  files:
+    - "**/*"
